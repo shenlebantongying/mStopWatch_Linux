@@ -1,0 +1,23 @@
+# GTK + C++
+---
+Checks: '*,
+-llvmlibc*,
+-altera*,
+-modernize-use-nodiscard,
+-modernize-use-trailing-return-type,
+-misc-use-anonymous-namespace,
+-cppcoreguidelines-avoid-non-const-global-variables,
+-readability-identifier-length,
+-misc-use-internal-linkage,
+-google-readability-casting,
+-misc-const-correctness,
+-bugprone-casting-through-void,
+-cppcoreguidelines-pro-type-cstyle-cast,
+-cppcoreguidelines-avoid-magic-numbers,
+-readability-magic-numbers,
+-bugprone-implicit-widening-of-multiplication-result,
+-performance-no-int-to-ptr,
+-google-readability-namespace-comments,
+-llvm-namespace-comment
+
+'

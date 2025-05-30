@@ -1,4 +1,6 @@
-# Dead Simple and Efficient StopWatch for Linux
+# Dead Simple, Efficient, Absolutely No Distraction StopWatch for Linux
+
+A particular type of stopwatch.
 
 Similar to
 

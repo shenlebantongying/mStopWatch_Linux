@@ -13,7 +13,6 @@ struct UI
   GtkWindow_autoptr window = nullptr;
   AdwToolbarView_autoptr toolbar_view = nullptr;
   GtkWidget_autoptr headbar = nullptr;
-  GtkButton_autoptr btn_reset = nullptr;
 
   GtkGesture_autoptr ges_shortclick = nullptr;
   GtkGesture_autoptr ges_longpress = nullptr;
@@ -29,6 +28,11 @@ struct States
 UI ui{};
 States states{};
 guint gsource_id = 0;
+
+PangoAttrList *font_attrs_default;
+PangoAttrList *font_attrs_red;
+
+///
 
 time_t
 get_current_time ()
@@ -77,6 +81,7 @@ gboolean
 start_reset ()
 {
 
+  gtk_label_set_attributes (ui.label, font_attrs_default);
   if (gsource_id > 0)
     {
       g_source_destroy (g_main_context_find_source_by_id (g_main_context_default (), gsource_id));
@@ -84,7 +89,8 @@ start_reset ()
   states.current_timestamp = get_current_time ();
   states.pause_duration = 0;
 
-  gsource_id = g_timeout_add (1000, GSourceFunc (ticking), nullptr);
+  ticking ();
+  gsource_id = g_timeout_add_seconds (1, GSourceFunc (ticking), nullptr);
   return TRUE;
 }
 
@@ -94,27 +100,25 @@ pause_unpause ()
   g_source_destroy (g_main_context_find_source_by_id (g_main_context_default (), gsource_id));
   if (states.paused)
     {
+      gtk_label_set_attributes (ui.label, font_attrs_default);
       states.paused = false;
-      gsource_id = g_timeout_add (1000, GSourceFunc (ticking), nullptr);
+
+      ticking ();
+      gsource_id = g_timeout_add_seconds (1, GSourceFunc (ticking), nullptr);
     }
   else
     {
+      gtk_label_set_attributes (ui.label, font_attrs_red);
       states.paused = true;
-      gsource_id = g_timeout_add (1000, GSourceFunc (inc_paused_duration), nullptr);
+
+      inc_paused_duration ();
+      gsource_id = g_timeout_add_seconds (1, GSourceFunc (inc_paused_duration), nullptr);
     }
 
   return TRUE;
 }
 
 // GUI
-
-gboolean
-reset (gpointer /*user_data*/)
-{
-  states.current_timestamp = get_current_time ();
-
-  return TRUE;
-}
 
 void
 init (GtkApplication *app)
@@ -133,20 +137,8 @@ init (GtkApplication *app)
   gtk_widget_add_controller (GTK_WIDGET (ui.label), GTK_EVENT_CONTROLLER (ui.ges_longpress));
   g_signal_connect (ui.ges_longpress, "pressed", G_CALLBACK (start_reset), NULL);
 
-  PangoAttrList *label_font_attr = pango_attr_list_new ();
-  PangoFontDescription *label_font_desc = pango_font_description_new ();
-  pango_font_description_set_size (label_font_desc, 36 * PANGO_SCALE);
-  PangoAttribute *attr = pango_attr_font_desc_new (label_font_desc);
-  pango_attr_list_insert (label_font_attr, attr);
-
-  gtk_label_set_attributes (ui.label, label_font_attr);
-
   ui.toolbar_view = (AdwToolbarView *) adw_toolbar_view_new ();
   ui.headbar = adw_header_bar_new ();
-  ui.btn_reset = (GtkButton *) gtk_button_new_with_label ("Reset");
-  gtk_widget_add_css_class (GTK_WIDGET (ui.btn_reset), "pill");
-
-  g_signal_connect (ui.btn_reset, "clicked", G_CALLBACK (reset), NULL);
 
   adw_toolbar_view_add_top_bar (ADW_TOOLBAR_VIEW (ui.toolbar_view), ui.headbar);
 
@@ -154,9 +146,24 @@ init (GtkApplication *app)
 
   adw_application_window_set_content (ADW_APPLICATION_WINDOW (ui.window), GTK_WIDGET (ui.toolbar_view));
 
-  gtk_window_present (GTK_WINDOW (ui.window));
-
   start_reset ();
+  gtk_window_present (GTK_WINDOW (ui.window));
+}
+
+void
+init_font_attrs ()
+{
+
+  PangoFontDescription *fond_desc = pango_font_description_new ();
+  pango_font_description_set_size (fond_desc, 36 * PANGO_SCALE);
+
+  font_attrs_default = pango_attr_list_new ();
+  pango_attr_list_insert (font_attrs_default, pango_attr_font_desc_new (fond_desc));
+
+  font_attrs_red = pango_attr_list_new ();
+
+  pango_attr_list_insert (font_attrs_red, pango_attr_font_desc_new (fond_desc));
+  pango_attr_list_insert (font_attrs_red, pango_attr_foreground_new (65535, 0, 0));
 }
 
 }
@@ -164,6 +171,8 @@ init (GtkApplication *app)
 int
 main (int argc, char *argv[])
 {
+  init_font_attrs ();
+
   g_autoptr (AdwApplication) app = adw_application_new ("org.slbtty.mStopWatch", G_APPLICATION_DEFAULT_FLAGS);
 
   g_signal_connect (app, "activate", G_CALLBACK (init), NULL);

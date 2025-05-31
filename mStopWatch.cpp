@@ -31,10 +31,9 @@ guint gsource_id = 0;
 PangoAttrList* font_attrs_default;
 PangoAttrList* font_attrs_red;
 
-///
+gchar* user_state_file = NULL;
 
-time_t
-get_current_time()
+time_t get_current_time()
 {
     time_t t = time(nullptr);
     if (t == ((time_t)-1)) {
@@ -45,7 +44,7 @@ get_current_time()
 }
 
 std::string
-GetTimeString(i64 v)
+get_time_string(i64 v)
 {
     constexpr i64 seconds_in_hour = 60 * 60;
     constexpr i64 seconds_in_min = 60;
@@ -60,8 +59,6 @@ GetTimeString(i64 v)
     return std::format("{}:{:02}:{:02}", n_hours, n_minutes, n_seconds);
 }
 
-///
-
 std::string states_to_str()
 {
     return std::format("{}\n{}\n{}\n{}\n", state_file_version, states.current_timestamp, states.pause_duration, states.paused);
@@ -70,7 +67,7 @@ std::string states_to_str()
 void states_write()
 {
     g_autofree GError* err = nullptr;
-    g_file_set_contents("./wtf.txt", states_to_str().c_str(), states_to_str().length(), &err);
+    g_file_set_contents(user_state_file, states_to_str().c_str(), (gssize)states_to_str().length(), &err);
     if (err != nullptr) {
         throw std::runtime_error(std::format("Cannot write file {}", err->message));
     }
@@ -81,9 +78,10 @@ bool states_read()
     g_autofree GError* err = nullptr;
     g_autofree gchar* content = nullptr;
     gsize length = 0;
-    g_file_get_contents("./wtf.txt", &content, &length, &err);
+    g_file_get_contents(user_state_file, &content, &length, &err);
     if (err != nullptr) {
-        throw std::runtime_error(std::format("Cannot read file {}", err->message));
+        g_info("Cannot read file %s", err->message);
+        return false;
     }
 
     gchar** string_segs = g_strsplit(content, "\n", 0);
@@ -94,32 +92,28 @@ bool states_read()
     } else {
         states.current_timestamp = g_ascii_strtoll(string_segs[1], NULL, 10);
         states.pause_duration = g_ascii_strtoll(string_segs[2], NULL, 10);
-        states.paused = (string_segs[3] == "true");
+        const gchar* true_str = "true";
+        states.paused = (string_segs[3] == true_str);
 
         g_strfreev(string_segs);
         return true;
     }
 }
 
-///
-
-gboolean
-inc_paused_duration()
+gboolean inc_paused_duration(void*)
 {
     states.pause_duration += 1;
     return TRUE;
 }
 
-gboolean
-ticking()
+gboolean ticking(void*)
 {
-    auto s = GetTimeString(get_current_time() - states.current_timestamp - states.pause_duration);
+    auto s = get_time_string(get_current_time() - states.current_timestamp - states.pause_duration);
     gtk_label_set_text(ui.label, s.c_str());
     return TRUE;
 }
 
-gboolean
-start()
+gboolean start(void*)
 {
     gtk_label_set_attributes(ui.label, font_attrs_default);
     if (gsource_id > 0) {
@@ -132,14 +126,13 @@ start()
         states.paused = false;
     }
 
-    ticking();
+    ticking(nullptr);
     gsource_id = g_timeout_add_seconds(1, GSourceFunc(ticking), nullptr);
     states_write();
     return TRUE;
 }
 
-gboolean
-reset()
+gboolean reset()
 {
     gtk_label_set_attributes(ui.label, font_attrs_default);
     if (gsource_id > 0) {
@@ -150,27 +143,26 @@ reset()
     states.pause_duration = 0;
     states.paused = false;
 
-    ticking();
+    ticking(nullptr);
     gsource_id = g_timeout_add_seconds(1, GSourceFunc(ticking), nullptr);
     states_write();
     return TRUE;
 }
 
-gboolean
-pause_unpause()
+gboolean pause_unpause()
 {
     g_source_destroy(g_main_context_find_source_by_id(g_main_context_default(), gsource_id));
     if (states.paused) {
         gtk_label_set_attributes(ui.label, font_attrs_default);
         states.paused = false;
 
-        ticking();
+        ticking(nullptr);
         gsource_id = g_timeout_add_seconds(1, GSourceFunc(ticking), nullptr);
     } else {
         gtk_label_set_attributes(ui.label, font_attrs_red);
         states.paused = true;
 
-        inc_paused_duration();
+        inc_paused_duration(nullptr);
         gsource_id = g_timeout_add_seconds(1, GSourceFunc(inc_paused_duration), nullptr);
     }
 
@@ -178,8 +170,6 @@ pause_unpause()
 
     return TRUE;
 }
-
-// GUI
 
 void cb_startup(GtkApplication* app)
 {
@@ -206,7 +196,7 @@ void cb_startup(GtkApplication* app)
 
     adw_application_window_set_content(ADW_APPLICATION_WINDOW(ui.window), GTK_WIDGET(ui.toolbar_view));
 
-    start();
+    start(nullptr);
     gtk_window_present(GTK_WINDOW(ui.window));
 }
 
@@ -228,11 +218,24 @@ void init_font_attrs()
 
     pango_attr_list_insert(font_attrs_red, pango_attr_font_desc_new(fond_desc));
     pango_attr_list_insert(font_attrs_red, pango_attr_foreground_new(65535, 0, 0));
+
+    pango_font_description_free(fond_desc);
 }
+
+void init_user_state_dir()
+{
+    g_autofree const gchar* usr_state_dir = g_get_user_state_dir();
+    user_state_file = g_build_path("/", usr_state_dir, "org.slbtty.mstopwatch.txt", NULL);
+    g_info("State File -> %s", user_state_file);
+}
+
 }
 
 int main(int argc, char* argv[])
 {
+
+    init_user_state_dir();
+
     init_font_attrs();
 
     g_autoptr(AdwApplication) app = adw_application_new("org.slbtty.mstopwatch", G_APPLICATION_DEFAULT_FLAGS);

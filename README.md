@@ -10,7 +10,7 @@ It has 2 operations:
 - Click -> Pause/Unpause
 - Long Press -> Restart
 
-The recording is stored to disk. The app doesn't need to be running in the background, and there no worries if the app is accidentablly closed.
+The recording is stored to disk. The app doesn't need to be running in the background, and there no worries if the app is accidentally closed.
 
 
 <img src="https://github.com/user-attachments/assets/10c8a03d-98d4-4d0d-8727-07c6af44eb2f" height=200>

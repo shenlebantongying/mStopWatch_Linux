@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=mStopWatch
+Type=Application
+Icon=clock
+StartupNotify=true
+Terminal=false
+Exec=mStopWatch
+
